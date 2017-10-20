@@ -12,15 +12,7 @@ bl_info = {
     "category": "UI"}
 
 import bpy
-def lockimg(self, context):
-    bpy.context.window.screen.areas[3].spaces[0].cursor_location.x=bpy.context.window.screen.areas[3].spaces[0].background_images[0].offset_x
-    bpy.context.window.screen.areas[3].spaces[0].cursor_location.y=bpy.context.window.screen.areas[3].spaces[0].background_images[0].offset_y
-    bpy.ops.view3d.snap_selected_to_cursor(use_offset=True)
-    return {'FINISHED'}
-def vieww():
-    V1 = bpy.context.window.screen.areas[3].spaces[0].region_3d.view_rotation.to_euler()
-    ViewCord = V1[0], V1[1], V1[2]
-    Vor=bpy.context.window.screen.areas[3].spaces[0].transform_orientation
+
 def sel(SEL):
     """Here second seleted all vertex
     """
@@ -48,7 +40,8 @@ class GCmsh(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
     optn= bpy.props.EnumProperty(
         items = [('INTERSECT', 'INTERSECT', 'INTERSECT'),
-                ('DIFFERENCE', 'DIFFERENCE', 'DIFFERENCE')],
+                ('DIFFERENCE', 'DIFFERENCE', 'DIFFERENCE'),
+                ('UNION', 'UNION', 'UNION')],
         default = 'DIFFERENCE')
 
     def execute(self, context):
@@ -59,32 +52,24 @@ class GCmsh(bpy.types.Operator):
         bpy.ops.object.convert(target='MESH')
 
         sel(True)
-        bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, 
-            TRANSFORM_OT_translate={"value":(0, 0, 100), 
-            "constraint_axis":(False, False, True), 
-            "constraint_orientation":'VIEW', 
-            "mirror":False, "proportional":'DISABLED', 
-            "proportional_edit_falloff":'SPHERE', 
-            "proportional_size":1, "snap":False, 
-            "snap_target":'CLOSEST', "snap_point":(0, 0, 0), 
-            "snap_align":False, "snap_normal":(0, 0, 0), 
-            "gpencil_strokes":False, "texture_space":False, 
-            "remove_on_cancel":False, "release_confirm":False})
 
+        bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, 
+                TRANSFORM_OT_translate={"value":(0, 0, 100), 
+                                        "constraint_axis":(False, False, True), 
+                                        "constraint_orientation":'VIEW'})
         bpy.ops.mesh.select_all(action='INVERT')
         # extrude out
-        bpy.ops.transform.translate(value=(0, 0, -100), 
-                constraint_axis=(False, False, True), 
-                constraint_orientation='VIEW', mirror=False, 
-                proportional='DISABLED', proportional_edit_falloff='SPHERE', 
-                proportional_size=1, release_confirm=True)
+        bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, 
+                TRANSFORM_OT_translate={"value":(0, 0, -100), 
+                                        "constraint_axis":(False, False, True), 
+                                        "constraint_orientation":'VIEW'})
         sel(True)
         bpy.ops.object.editmode_toggle()
         # CUT
-        bpy.ops.scene.gcut(optn=self.optn)
+        bpy.ops.scene.gcut()
 
         return {'FINISHED'}
-    
+
 class GCUT(bpy.types.Operator):
     bl_idname = "scene.gcut"
     bl_label = "gcut"
@@ -92,8 +77,11 @@ class GCUT(bpy.types.Operator):
     
     optn= bpy.props.EnumProperty(
     items = [('INTERSECT', 'INTERSECT', 'INTERSECT'),
-            ('DIFFERENCE', 'DIFFERENCE', 'DIFFERENCE')],
+            ('DIFFERENCE', 'DIFFERENCE', 'DIFFERENCE'),
+            ('UNION', 'UNION', 'UNION')],
     default = 'DIFFERENCE')
+
+    
     def execute(self, context):
         if len(bpy.context.selected_objects) ==2:
             frst = bpy.context.scene.objects.active
@@ -101,34 +89,39 @@ class GCUT(bpy.types.Operator):
             bpy.context.scene.objects.active = bpy.context.selected_objects[0]         
             scnd = bpy.context.scene.objects.active
             scnd.select = True
-            bpy.ops.object.editmode_toggle()
             sel(False)
+            bpy.ops.object.editmode_toggle()
+            
             thrd = bpy.context.scene.objects.active
             frst.select = True
-            
             Vor=bpy.context.window.screen.areas[3].spaces[0].transform_orientation
+        #JOIN
             bpy.ops.object.join()
             bpy.ops.object.editmode_toggle()
             bpy.ops.mesh.intersect_boolean(operation=self.optn)
             # def orient
             bpy.ops.object.editmode_toggle()
             nornorm()
-            bpy.ops.view3d.copybuffer()
-            bpy.ops.view3d.pastebuffer()
             bpy.ops.transform.select_orientation(orientation=Vor)
+        else:
+            self.report({'INFO'}, "Select 2 objets")
         return {'FINISHED'}
 
+class GCSl(bpy.types.Operator):
+    bl_idname = "scene.gslice"
+    bl_label = "gslice"
+    bl_options = {"REGISTER", "UNDO"}
 class CCyli(bpy.types.Operator):
     bl_idname = "scene.ccyli"
     bl_label = "Ccyli"
     bl_options = {"REGISTER", "UNDO"}
     
     prof= bpy.props.EnumProperty(
-        items = [('circle', 'circle', 'circle'),
-                ('square', 'square', 'square'),
-                ('triangle', 'triangle', 'triangle')],
-                name = '',
-        default = 'circle')
+    items = [('circle', 'circle', 'circle'),
+            ('square', 'square', 'square'),
+            ('triangle', 'triangle', 'triangle')],
+            name = '',
+    default = 'circle')
     cylrad = bpy.props.FloatProperty(
         name = 'Radius',
         default = 0.2
@@ -139,10 +132,6 @@ class CCyli(bpy.types.Operator):
         min = -360,
         max = 360
         )
-    optn= bpy.props.EnumProperty(
-        items = [('INTERSECT', 'INTERSECT', 'INTERSECT'),
-                ('DIFFERENCE', 'DIFFERENCE', 'DIFFERENCE')],
-        default = 'DIFFERENCE')
     def execute(self, context):
         # Screen_Orient
         sel(False)
@@ -160,10 +149,9 @@ class CCyli(bpy.types.Operator):
             rotation=(ViewCord)
             )
         if self.prof != 'circle':
-            import math    
-            bpy.ops.transform.rotate(value=math.radians(self.cstm), axis=(ViewCord), constraint_axis=(False, False, True), constraint_orientation='VIEW', mirror=False, proportional='DISABLED', proportional_edit_falloff='SMOOTH', proportional_size=1, release_confirm=True)
+            import math                    
         frst.select = True     
-        bpy.ops.scene.gcut()
+        bpy.ops.scene.gcut(optn='DIFFERENCE')
         return {'FINISHED'}
         
 class GC(bpy.types.Panel):
@@ -171,13 +159,13 @@ class GC(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     
-    def draw(self, context):      
+    def draw(self, contex):      
         layout = self.layout  
         layout.operator("scene.gcmsh", text='GPCutter')
         if bpy.context.object and bpy.context.object.type == 'MESH':
             layout.operator("scene.ccyli", text='Fast_Hole')
             layout.operator("scene.gcut", text='Bisecta')
-
+    
 def register():
     bpy.utils.register_class(CCyli)
     bpy.utils.register_class(GCmsh)
